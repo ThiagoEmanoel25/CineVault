@@ -1,0 +1,745 @@
+// Configuração da API
+const API_BASE_URL = window.location.origin + '/api';
+
+// Estado da aplicação
+let filmes = [];
+let editingId = null;
+let currentFilter = 'all';
+let sortBy = 'nome'; // 'nome', 'ano', 'avaliacao'
+let searchTimeout = null;
+
+// Elementos DOM
+const filmeForm = document.getElementById('filme-form');
+const nomeInput = document.getElementById('nome');
+const generoInput = document.getElementById('genero');
+const anolancementoInput = document.getElementById('anolancemento');
+const diretorInput = document.getElementById('diretor');
+const duracaoInput = document.getElementById('duracao');
+const avaliacaoInput = document.getElementById('avaliacao');
+const sinopseInput = document.getElementById('sinopse');
+const posterInput = document.getElementById('poster');
+const filmeIdInput = document.getElementById('filme-id');
+const submitBtn = document.getElementById('submit-btn');
+const cancelBtn = document.getElementById('cancel-btn');
+const formTitle = document.getElementById('form-title');
+const filmesContainer = document.getElementById('filmes-container');
+const emptyState = document.getElementById('empty-state');
+const filmesCount = document.getElementById('filmes-count');
+const searchInput = document.getElementById('search-input');
+const loading = document.getElementById('loading');
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+    carregarFilmes();
+    setupEventListeners();
+});
+
+// Event Listeners
+function setupEventListeners() {
+    filmeForm.addEventListener('submit', handleSubmit);
+    cancelBtn.addEventListener('click', cancelEdit);
+    searchInput.addEventListener('input', handleSearch);
+
+    // Filtros
+    document.getElementById('filter-all')?.addEventListener('click', () => setFilter('all'));
+    document.getElementById('filter-acao')?.addEventListener('click', () => setFilter('ação'));
+    document.getElementById('filter-drama')?.addEventListener('click', () => setFilter('drama'));
+    document.getElementById('filter-comedia')?.addEventListener('click', () => setFilter('comédia'));
+    document.getElementById('filter-ficcao')?.addEventListener('click', () => setFilter('ficção'));
+
+    // Ordenação
+    document.querySelectorAll('.btn-sort').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sort = btn.dataset.sort;
+            setSort(sort);
+        });
+    });
+
+    // Exportar/Importar
+    document.getElementById('export-btn')?.addEventListener('click', exportarFilmes);
+    document.getElementById('import-btn')?.addEventListener('click', () => {
+        document.getElementById('import-input')?.click();
+    });
+    document.getElementById('import-input')?.addEventListener('change', importarFilmes);
+}
+
+// Validação do formulário
+function validarFormulario() {
+    const nome = nomeInput.value.trim();
+    const genero = generoInput.value.trim();
+    const ano = parseInt(anolancementoInput.value);
+    const duracao = duracaoInput.value ? parseInt(duracaoInput.value) : 0;
+    const avaliacao = avaliacaoInput.value ? parseFloat(avaliacaoInput.value) : 0;
+
+    if (nome.length < 2) {
+        showToast('Nome deve ter pelo menos 2 caracteres', 'error');
+        nomeInput.focus();
+        return false;
+    }
+
+    if (genero.length < 2) {
+        showToast('Gênero deve ter pelo menos 2 caracteres', 'error');
+        generoInput.focus();
+        return false;
+    }
+
+    const anoAtual = new Date().getFullYear();
+    if (!ano || ano < 1800 || ano > anoAtual + 5) {
+        showToast(`Ano deve estar entre 1800 e ${anoAtual + 5}`, 'error');
+        anolancementoInput.focus();
+        return false;
+    }
+
+    if (duracao < 0 || duracao > 600) {
+        showToast('Duração deve estar entre 0 e 600 minutos', 'error');
+        duracaoInput.focus();
+        return false;
+    }
+
+    if (avaliacao < 0 || avaliacao > 10) {
+        showToast('Avaliação deve estar entre 0 e 10', 'error');
+        avaliacaoInput.focus();
+        return false;
+    }
+
+    return true;
+}
+
+// Carregar filmes com cache
+async function carregarFilmes() {
+    // Tentar carregar do cache primeiro
+    const cached = carregarFilmesLocal();
+    if (cached && cached.length > 0) {
+        filmes = cached;
+        renderizarFilmes();
+        calcularEstatisticas();
+    }
+
+    try {
+        showLoading(true);
+        const result = await fazerRequisicao(`${API_BASE_URL}/filmes`);
+
+        if (result.success) {
+            filmes = result.data || [];
+            salvarFilmesLocal(filmes);
+            renderizarFilmes();
+            calcularEstatisticas();
+        } else {
+            showToast('Erro ao carregar filmes', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        if (filmes.length === 0) {
+            showToast('Erro ao conectar com o servidor. Usando cache local.', 'error');
+        }
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Cache LocalStorage
+function salvarFilmesLocal(filmes) {
+    try {
+        localStorage.setItem('filmes_cache', JSON.stringify(filmes));
+        localStorage.setItem('filmes_cache_time', Date.now().toString());
+    } catch (error) {
+        console.error('Erro ao salvar cache:', error);
+    }
+}
+
+function carregarFilmesLocal() {
+    try {
+        const cache = localStorage.getItem('filmes_cache');
+        const cacheTime = localStorage.getItem('filmes_cache_time');
+
+        // Cache válido por 5 minutos
+        if (cache && cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
+            return JSON.parse(cache);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar cache:', error);
+    }
+    return null;
+}
+
+// Requisição HTTP melhorada
+async function fazerRequisicao(url, options = {}) {
+    try {
+        const config = {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        };
+
+        // Se tiver body, garantir que seja string JSON
+        if (config.body && typeof config.body !== 'string') {
+            config.body = JSON.stringify(config.body);
+        }
+
+        console.log('Fazendo requisição para:', url, config);
+
+        const response = await fetch(url, config);
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Erro na resposta:', response.status, errorText);
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('Resposta recebida:', result);
+        return result;
+    } catch (error) {
+        console.error('Erro na requisição:', error);
+
+        if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            showToast('Sem conexão com o servidor. Verifique se o servidor está rodando.', 'error');
+        } else {
+            showToast('Erro: ' + error.message, 'error');
+        }
+
+        throw error;
+    }
+}
+
+// Renderizar filmes com ordenação
+function renderizarFilmes() {
+    let filmesFiltrados = [...filmes];
+
+    // Aplicar filtro de gênero
+    if (currentFilter !== 'all') {
+        filmesFiltrados = filmesFiltrados.filter(filme =>
+            filme.genero.toLowerCase().includes(currentFilter.toLowerCase())
+        );
+    }
+
+    // Aplicar busca
+    const searchTerm = searchInput.value.toLowerCase();
+    if (searchTerm) {
+        filmesFiltrados = filmesFiltrados.filter(filme =>
+            filme.nome.toLowerCase().includes(searchTerm) ||
+            filme.genero.toLowerCase().includes(searchTerm) ||
+            (filme.diretor && filme.diretor.toLowerCase().includes(searchTerm)) ||
+            (filme.sinopse && filme.sinopse.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    // Ordenar
+    filmesFiltrados.sort((a, b) => {
+        switch (sortBy) {
+            case 'nome':
+                return a.nome.localeCompare(b.nome);
+            case 'ano':
+                return b.anolancemento - a.anolancemento; // mais recente primeiro
+            case 'avaliacao':
+                return (b.avaliacao || 0) - (a.avaliacao || 0); // maior avaliação primeiro
+            default:
+                return 0;
+        }
+    });
+
+    // Atualizar contador
+    filmesCount.textContent = filmesFiltrados.length;
+
+    // Renderizar
+    if (filmesFiltrados.length === 0) {
+        filmesContainer.style.display = 'none';
+        emptyState.style.display = 'block';
+    } else {
+        filmesContainer.style.display = 'grid';
+        emptyState.style.display = 'none';
+
+        filmesContainer.innerHTML = filmesFiltrados.map(filme => {
+            // Sempre mostrar poster (placeholder SVG local se não tiver URL)
+            const posterUrl = (filme.poster && filme.poster.trim())
+                ? filme.poster
+                : gerarPlaceholderSVG(filme.nome, 300, 450);
+            const placeholderUrl = gerarPlaceholderSVG(filme.nome, 300, 450);
+
+            const avaliacao = (filme.avaliacao && filme.avaliacao > 0) ? filme.avaliacao.toFixed(1) : 'N/A';
+            const duracao = (filme.duracao && filme.duracao > 0) ? `${filme.duracao} min` : '';
+            const diretor = (filme.diretor && filme.diretor.trim()) ? `<div class="filme-diretor">🎬 ${escapeHtml(filme.diretor)}</div>` : '';
+            const sinopse = (filme.sinopse && filme.sinopse.trim()) ? `<div class="filme-sinopse">${escapeHtml(filme.sinopse.substring(0, 100))}${filme.sinopse.length > 100 ? '...' : ''}</div>` : '';
+
+            return `
+                <div class="filme-card">
+                    <img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(filme.nome)}" class="filme-poster" onerror="this.src='${placeholderUrl}'">
+                    <div class="filme-header">
+                        <div>
+                            <div class="filme-nome">${escapeHtml(filme.nome)}</div>
+                        </div>
+                        <div class="filme-ano">${filme.anolancemento}</div>
+                    </div>
+                    <div class="filme-genero">${escapeHtml(filme.genero)}</div>
+                    ${diretor}
+                    <div class="filme-info">
+                        ${avaliacao !== 'N/A' ? `<span class="filme-avaliacao">⭐ ${avaliacao}</span>` : ''}
+                        ${duracao ? `<span class="filme-duracao">⏱️ ${duracao}</span>` : ''}
+                    </div>
+                    ${sinopse}
+                    <div class="filme-actions">
+                        <button class="btn btn-info" onclick="verDetalhes('${filme._id}')">
+                            👁️ Ver Detalhes
+                        </button>
+                        <button class="btn btn-edit" onclick="editarFilme('${filme._id}')">
+                            ✏️ Editar
+                        </button>
+                        <button class="btn btn-delete" onclick="confirmarDeletar('${filme._id}')">
+                            🗑️ Deletar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// Handle Submit
+async function handleSubmit(e) {
+    e.preventDefault();
+
+    if (!validarFormulario()) {
+        return;
+    }
+
+    // Coletar dados do formulário de forma segura
+    const nome = nomeInput ? nomeInput.value.trim() : '';
+    const genero = generoInput ? generoInput.value.trim() : '';
+    const anolancemento = anolancementoInput ? parseInt(anolancementoInput.value) : 0;
+    const diretor = diretorInput && diretorInput.value ? diretorInput.value.trim() : '';
+    const duracao = duracaoInput && duracaoInput.value ? parseInt(duracaoInput.value) : 0;
+    const avaliacao = avaliacaoInput && avaliacaoInput.value ? parseFloat(avaliacaoInput.value) : 0;
+    const sinopse = sinopseInput && sinopseInput.value ? sinopseInput.value.trim() : '';
+    const poster = posterInput && posterInput.value ? posterInput.value.trim() : '';
+
+    const filmeData = {
+        nome: nome,
+        genero: genero,
+        anolancemento: anolancemento,
+        diretor: diretor,
+        duracao: duracao,
+        avaliacao: avaliacao,
+        sinopse: sinopse,
+        poster: poster
+    };
+
+    console.log('Dados do filme a serem enviados:', filmeData);
+
+    try {
+        let result;
+        if (editingId) {
+            result = await fazerRequisicao(`${API_BASE_URL}/filmes/${editingId}`, {
+                method: 'PUT',
+                body: JSON.stringify(filmeData)
+            });
+        } else {
+            result = await fazerRequisicao(`${API_BASE_URL}/filmes`, {
+                method: 'POST',
+                body: JSON.stringify(filmeData)
+            });
+        }
+
+        if (result.success) {
+            showToast(
+                editingId ? 'Filme atualizado com sucesso! 🎉' : 'Filme adicionado com sucesso! 🎉',
+                'success'
+            );
+            resetForm();
+            carregarFilmes();
+        } else {
+            // Melhorar mensagem de erro
+            const mensagemErro = result.message || 'Erro ao salvar filme';
+            console.error('Erro ao salvar:', result);
+            showToast(mensagemErro, 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showToast('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// Editar filme
+async function editarFilme(id) {
+    try {
+        const result = await fazerRequisicao(`${API_BASE_URL}/filmes/${id}`);
+
+        if (result.success) {
+            const filme = result.data;
+            if (nomeInput) nomeInput.value = filme.nome || '';
+            if (generoInput) generoInput.value = filme.genero || '';
+            if (anolancementoInput) anolancementoInput.value = filme.anolancemento || '';
+            if (diretorInput) diretorInput.value = filme.diretor || '';
+            if (duracaoInput) duracaoInput.value = filme.duracao || '';
+            if (avaliacaoInput) avaliacaoInput.value = filme.avaliacao || '';
+            if (sinopseInput) sinopseInput.value = filme.sinopse || '';
+            if (posterInput) posterInput.value = filme.poster || '';
+            filmeIdInput.value = filme._id;
+            editingId = filme._id;
+
+            formTitle.textContent = 'Editar Filme';
+            submitBtn.textContent = 'Atualizar Filme';
+            cancelBtn.style.display = 'block';
+
+            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+        } else {
+            showToast('Erro ao carregar filme', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showToast('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// Cancelar edição
+function cancelEdit() {
+    resetForm();
+}
+
+// Resetar formulário
+function resetForm() {
+    filmeForm.reset();
+    filmeIdInput.value = '';
+    editingId = null;
+    formTitle.textContent = 'Adicionar Novo Filme';
+    submitBtn.textContent = 'Adicionar Filme';
+    cancelBtn.style.display = 'none';
+}
+
+// Confirmar deletar
+function confirmarDeletar(id) {
+    const filme = filmes.find(f => f._id === id);
+    if (!filme) return;
+
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalMessage = document.getElementById('modal-message');
+    const modalConfirm = document.getElementById('modal-confirm');
+
+    modalTitle.textContent = 'Confirmar Exclusão';
+    modalMessage.textContent = `Tem certeza que deseja deletar "${filme.nome}"? Esta ação não pode ser desfeita.`;
+
+    modalConfirm.onclick = () => deletarFilme(id);
+
+    modal.classList.add('show');
+
+    document.querySelector('.close').onclick = () => modal.classList.remove('show');
+    document.getElementById('modal-cancel').onclick = () => modal.classList.remove('show');
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.classList.remove('show');
+    };
+}
+
+// Deletar filme
+async function deletarFilme(id) {
+    try {
+        const result = await fazerRequisicao(`${API_BASE_URL}/filmes/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (result.success) {
+            showToast('Filme deletado com sucesso! 🗑️', 'success');
+            document.getElementById('modal').classList.remove('show');
+            carregarFilmes();
+        } else {
+            showToast(result.message || 'Erro ao deletar filme', 'error');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showToast('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// Filtros
+function setFilter(genero) {
+    currentFilter = genero;
+
+    document.querySelectorAll('.btn-filter').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    if (genero === 'all') {
+        document.getElementById('filter-all')?.classList.add('active');
+    } else {
+        const btn = document.getElementById(`filter-${genero.toLowerCase()}`);
+        if (btn) btn.classList.add('active');
+    }
+
+    renderizarFilmes();
+}
+
+// Ordenação
+function setSort(criteria) {
+    sortBy = criteria;
+
+    document.querySelectorAll('.btn-sort').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.sort === criteria) {
+            btn.classList.add('active');
+        }
+    });
+
+    renderizarFilmes();
+}
+
+// Busca com debounce
+function handleSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        renderizarFilmes();
+    }, 300); // Aguarda 300ms após parar de digitar
+}
+
+// Estatísticas
+function calcularEstatisticas() {
+    if (filmes.length === 0) {
+        document.getElementById('total-filmes').textContent = '0';
+        document.getElementById('ano-medio').textContent = '0';
+        document.getElementById('avaliacao-media').textContent = '0.0';
+        document.getElementById('genero-comum').textContent = '-';
+        return;
+    }
+
+    const total = filmes.length;
+    const generos = {};
+    let somaAnos = 0;
+    let somaAvaliacoes = 0;
+    let countAvaliacoes = 0;
+
+    filmes.forEach(filme => {
+        generos[filme.genero] = (generos[filme.genero] || 0) + 1;
+        somaAnos += filme.anolancemento;
+        if (filme.avaliacao && filme.avaliacao > 0) {
+            somaAvaliacoes += filme.avaliacao;
+            countAvaliacoes++;
+        }
+    });
+
+    document.getElementById('total-filmes').textContent = total;
+    document.getElementById('ano-medio').textContent = Math.round(somaAnos / total);
+
+    const avaliacaoMedia = countAvaliacoes > 0 ? (somaAvaliacoes / countAvaliacoes).toFixed(1) : '0.0';
+    document.getElementById('avaliacao-media').textContent = avaliacaoMedia;
+
+    const generoComum = Object.entries(generos)
+        .sort((a, b) => b[1] - a[1])[0];
+    document.getElementById('genero-comum').textContent = generoComum ? generoComum[0] : '-';
+}
+
+// Exportar/Importar
+function exportarFilmes() {
+    const dataStr = JSON.stringify(filmes, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `catalogo-filmes-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Catálogo exportado com sucesso! 📥', 'success');
+}
+
+async function importarFilmes(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if (!Array.isArray(imported)) {
+                showToast('Formato de arquivo inválido', 'error');
+                return;
+            }
+
+            let sucessos = 0;
+            let erros = 0;
+
+            for (const filme of imported) {
+                try {
+                    await fazerRequisicao(`${API_BASE_URL}/filmes`, {
+                        method: 'POST',
+                        body: JSON.stringify(filme)
+                    });
+                    sucessos++;
+                } catch (error) {
+                    erros++;
+                }
+            }
+
+            showToast(`Importação concluída: ${sucessos} sucessos, ${erros} erros`, 'success');
+            carregarFilmes();
+        } catch (error) {
+            showToast('Erro ao ler arquivo', 'error');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+}
+
+// Loading
+function showLoading(show) {
+    if (loading) {
+        loading.style.display = show ? 'block' : 'none';
+    }
+    if (show) {
+        if (filmesContainer) filmesContainer.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'none';
+    }
+}
+
+// Toast
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 3000);
+}
+
+// Gerar placeholder SVG (não depende de serviços externos)
+function gerarPlaceholderSVG(nome, largura = 300, altura = 450) {
+    const texto = nome.substring(0, 20).replace(/[<>]/g, ''); // Limitar e remover caracteres problemáticos
+    const svg = `<svg width="${largura}" height="${altura}" xmlns="http://www.w3.org/2000/svg">
+<rect width="100%" height="100%" fill="#6366f1"/>
+<text x="50%" y="50%" font-family="Arial, sans-serif" font-size="18" fill="#ffffff" text-anchor="middle" dominant-baseline="middle" font-weight="bold">${texto}</text>
+</svg>`;
+    try {
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    } catch (e) {
+        // Fallback simples
+        return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjQ1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNjM2NmYxIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iI2ZmZmZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC13ZWlnaHQ9ImJvbGQiPkZJTElNRTwvdGV4dD48L3N2Zz4=';
+    }
+}
+
+// Escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Ver detalhes do filme
+function verDetalhes(id) {
+    const filme = filmes.find(f => f._id === id);
+    if (!filme) {
+        showToast('Filme não encontrado', 'error');
+        return;
+    }
+
+    const modal = document.getElementById('detalhes-modal');
+    const content = document.getElementById('detalhes-content');
+
+    const posterUrl = (filme.poster && filme.poster.trim()) ? filme.poster : gerarPlaceholderSVG(filme.nome, 400, 600);
+    const placeholderUrl = gerarPlaceholderSVG(filme.nome, 400, 600);
+    const avaliacao = filme.avaliacao ? filme.avaliacao.toFixed(1) : 'Não avaliado';
+    const duracao = filme.duracao ? `${filme.duracao} minutos` : 'Não informado';
+    const diretor = filme.diretor || 'Não informado';
+    const sinopse = filme.sinopse || 'Sinopse não disponível.';
+    const genero = filme.genero || 'Não informado';
+    const ano = filme.anolancemento || 'Não informado';
+
+    // Criar estrelas para avaliação
+    const estrelas = filme.avaliacao ? gerarEstrelas(filme.avaliacao) : '';
+
+    content.innerHTML = `
+        <div class="detalhes-container">
+            <div class="detalhes-poster">
+                <img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(filme.nome)}" class="detalhes-poster-img" onerror="this.src='${placeholderUrl}'">
+            </div>
+            <div class="detalhes-info">
+                <h2 class="detalhes-titulo">${escapeHtml(filme.nome)}</h2>
+
+                <div class="detalhes-meta">
+                    <div class="detalhes-item">
+                        <span class="detalhes-label">📅 Ano:</span>
+                        <span class="detalhes-value">${ano}</span>
+                    </div>
+                    <div class="detalhes-item">
+                        <span class="detalhes-label">🎭 Gênero:</span>
+                        <span class="detalhes-value">${escapeHtml(genero)}</span>
+                    </div>
+                    <div class="detalhes-item">
+                        <span class="detalhes-label">🎬 Diretor:</span>
+                        <span class="detalhes-value">${escapeHtml(diretor)}</span>
+                    </div>
+                    <div class="detalhes-item">
+                        <span class="detalhes-label">⏱️ Duração:</span>
+                        <span class="detalhes-value">${duracao}</span>
+                    </div>
+                    <div class="detalhes-item">
+                        <span class="detalhes-label">⭐ Avaliação:</span>
+                        <span class="detalhes-value">
+                            ${estrelas}
+                            <span class="detalhes-avaliacao-num">${avaliacao}/10</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="detalhes-sinopse">
+                    <h3 class="detalhes-sinopse-titulo">📖 Sinopse</h3>
+                    <p class="detalhes-sinopse-texto">${escapeHtml(sinopse)}</p>
+                </div>
+
+                <div class="detalhes-actions">
+                    <button class="btn btn-primary" onclick="editarFilme('${filme._id}'); fecharDetalhes();">
+                        ✏️ Editar Filme
+                    </button>
+                    <button class="btn btn-secondary" onclick="fecharDetalhes()">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.classList.add('show');
+
+    // Fechar modal
+    document.querySelector('.close-detalhes').onclick = fecharDetalhes;
+    modal.onclick = (e) => {
+        if (e.target === modal) fecharDetalhes();
+    };
+
+    // Fechar com ESC
+    document.addEventListener('keydown', function fecharComEsc(e) {
+        if (e.key === 'Escape' && modal.classList.contains('show')) {
+            fecharDetalhes();
+            document.removeEventListener('keydown', fecharComEsc);
+        }
+    });
+}
+
+function fecharDetalhes() {
+    const modal = document.getElementById('detalhes-modal');
+    modal.classList.remove('show');
+}
+
+function gerarEstrelas(avaliacao) {
+    const estrelasCheias = Math.floor(avaliacao);
+    const temMeiaEstrela = avaliacao % 1 >= 0.5;
+    const estrelasVazias = 10 - estrelasCheias - (temMeiaEstrela ? 1 : 0);
+
+    let html = '';
+    for (let i = 0; i < estrelasCheias; i++) {
+        html += '<span class="estrela estrela-cheia">⭐</span>';
+    }
+    if (temMeiaEstrela) {
+        html += '<span class="estrela estrela-meia">⭐</span>';
+    }
+    for (let i = 0; i < estrelasVazias; i++) {
+        html += '<span class="estrela estrela-vazia">☆</span>';
+    }
+    return html;
+}
+
+// Expor funções globalmente
+window.editarFilme = editarFilme;
+window.confirmarDeletar = confirmarDeletar;
+window.verDetalhes = verDetalhes;
