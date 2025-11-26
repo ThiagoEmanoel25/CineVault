@@ -1,10 +1,12 @@
 {
   "name": "meu-primeiro-projeto-em-node",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Catálogo de Filmes com API REST e Frontend Moderno",
+  "main": "server.js",
   "dependencies": {
     "bson": "^6.10.4",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "memory-pager": "^1.5.0",
     "mongodb": "^6.20.0",
     "mongodb-connection-string-url": "^3.0.2",
@@ -16,11 +18,13 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node interface.js",
+    "start": "node server.js",
+    "dev": "node server.js",
+    "interface": "node interface.js",
     "demo": "node crud-demo.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["filmes", "catalogo", "mongodb", "api", "rest"],
   "author": "",
   "license": "ISC"
 }
