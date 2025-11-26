@@ -1,6 +1,14 @@
-# CRUD de Filmes - MongoDB Atlas
+# 🎬 Catálogo de Filmes - Full Stack
 
-Este projeto implementa um sistema CRUD (Create, Read, Update, Delete) completo para gerenciar filmes usando MongoDB Atlas e Node.js.
+Este projeto implementa um sistema CRUD (Create, Read, Update, Delete) completo para gerenciar filmes usando MongoDB Atlas, Node.js, Express e um frontend moderno com HTML/CSS/JavaScript.
+
+## ✨ Características
+
+- 🎨 **Frontend Moderno**: Interface responsiva e estilosa com design dark mode
+- 🚀 **API REST**: Backend completo com Express.js
+- 💾 **MongoDB Atlas**: Banco de dados na nuvem
+- 🌐 **Deploy Pronto**: Configurado para deploy no Vercel
+- 📱 **Responsivo**: Funciona perfeitamente em desktop e mobile
 
 ## 📁 Estrutura do Projeto
 
@@ -12,10 +20,16 @@ meu-primeiro-projeto-em-node/
 │   └── filmeController.js   # Lógica de negócio e operações CRUD
 ├── models/
 │   └── Filme.js            # Modelo de dados do filme
+├── public/                  # Frontend
+│   ├── index.html          # Página principal
+│   ├── styles.css          # Estilos modernos
+│   └── app.js              # Lógica do frontend
 ├── routes/                  # (Para futuras implementações)
-├── index.js                 # Arquivo original
+├── server.js               # Servidor Express (API REST)
+├── index.js                # Arquivo original
 ├── crud-demo.js            # Demonstração completa do CRUD
-├── interface.js            # Interface interativa
+├── interface.js            # Interface interativa CLI
+├── vercel.json             # Configuração do Vercel
 ├── package.json
 └── README.md
 ```
@@ -34,22 +48,46 @@ Cada filme possui os seguintes campos:
 npm install
 ```
 
-### 2. Executar a Interface Interativa
+### 2. Executar o Servidor (API + Frontend)
 ```bash
 npm start
 ```
-ou
+Isso iniciará o servidor Express na porta 3000. Acesse `http://localhost:3000` no navegador para ver o frontend.
+
+### 3. Outros Comandos Disponíveis
+
+**Interface CLI Interativa:**
 ```bash
-node interface.js
+npm run interface
 ```
 
-### 3. Executar Demonstração Automática
+**Demonstração Automática:**
 ```bash
 npm run demo
 ```
-ou
+
+## 🌐 API REST Endpoints
+
+A API está disponível em `/api`:
+
+- `GET /api/filmes` - Listar todos os filmes
+- `GET /api/filmes/:id` - Buscar filme por ID
+- `GET /api/filmes/genero/:genero` - Buscar filmes por gênero
+- `POST /api/filmes` - Criar novo filme
+- `PUT /api/filmes/:id` - Atualizar filme
+- `DELETE /api/filmes/:id` - Deletar filme
+- `GET /api/health` - Verificar status da API
+
+### Exemplo de Uso da API
+
 ```bash
-node crud-demo.js
+# Criar filme
+curl -X POST http://localhost:3000/api/filmes \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"The Batman","genero":"Ação","anolancemento":2022}'
+
+# Listar filmes
+curl http://localhost:3000/api/filmes
 ```
 
 ## 📋 Operações CRUD Disponíveis
@@ -132,9 +170,33 @@ const resultado = await FilmeController.atualizarFilme(id, {
 const resultado = await FilmeController.deletarFilme(id);
 ```
 
+## 🚀 Deploy no Vercel
+
+Este projeto está configurado para deploy no Vercel! Veja o guia completo em [DEPLOY.md](./DEPLOY.md).
+
+**Resumo rápido:**
+1. Faça push do código para o GitHub
+2. Conecte o repositório no Vercel
+3. Deploy automático! 🎉
+
+Para mais detalhes, consulte o arquivo `DEPLOY.md`.
+
+## 🎯 Funcionalidades do Frontend
+
+- ✅ Interface moderna e responsiva
+- ✅ Adicionar, editar e deletar filmes
+- ✅ Busca em tempo real
+- ✅ Filtros por gênero
+- ✅ Notificações toast
+- ✅ Modal de confirmação
+- ✅ Design dark mode elegante
+- ✅ Animações suaves
+
 ## 🎯 Próximos Passos
 
-- [ ] Implementar API REST com Express.js
+- [x] Implementar API REST com Express.js
+- [x] Criar frontend moderno
+- [x] Configurar deploy no Vercel
 - [ ] Adicionar autenticação e autorização
 - [ ] Implementar paginação para listagens
 - [ ] Adicionar upload de imagens para filmes
