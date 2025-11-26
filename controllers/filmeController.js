@@ -6,9 +6,12 @@ class FilmeController {
     // CREATE - Criar um novo filme
     static async criarFilme(filmeData) {
         try {
+            console.log('Dados recebidos no controller:', filmeData);
+
             // Validar dados
             const validation = Filme.validate(filmeData);
             if (!validation.isValid) {
+                console.error('Erros de validação:', validation.errors);
                 throw new Error('Dados inválidos: ' + validation.errors.join(', '));
             }
 
@@ -16,8 +19,19 @@ class FilmeController {
             await connectToDatabase();
             const collection = getCollection();
 
-            // Criar filme
-            const filme = new Filme(filmeData.nome, filmeData.genero, filmeData.anolancemento);
+            // Criar filme - garantir que valores numéricos sejam números
+            const filme = new Filme(
+                filmeData.nome,
+                filmeData.genero,
+                filmeData.anolancemento,
+                filmeData.diretor || '',
+                filmeData.duracao ? (typeof filmeData.duracao === 'string' ? parseInt(filmeData.duracao) : filmeData.duracao) : 0,
+                filmeData.avaliacao ? (typeof filmeData.avaliacao === 'string' ? parseFloat(filmeData.avaliacao) : filmeData.avaliacao) : 0,
+                filmeData.sinopse || '',
+                filmeData.poster || ''
+            );
+
+            console.log('Filme criado:', filme.toJSON());
 
             // Inserir no banco
             const result = await collection.insertOne(filme.toJSON());
@@ -151,15 +165,32 @@ class FilmeController {
                 };
             }
 
-            // Atualizar filme
-            const filme = new Filme(filmeData.nome, filmeData.genero, filmeData.anolancemento);
-            const result = await collection.updateOne(
-                { _id: new ObjectId(id) },
-                { $set: filme.toJSON() }
+            // Atualizar filme - garantir que valores numéricos sejam números
+            const filme = new Filme(
+                filmeData.nome,
+                filmeData.genero,
+                filmeData.anolancemento,
+                filmeData.diretor || '',
+                filmeData.duracao ? (typeof filmeData.duracao === 'string' ? parseInt(filmeData.duracao) : filmeData.duracao) : 0,
+                filmeData.avaliacao ? (typeof filmeData.avaliacao === 'string' ? parseFloat(filmeData.avaliacao) : filmeData.avaliacao) : 0,
+                filmeData.sinopse || '',
+                filmeData.poster || ''
             );
 
-            if (result.modifiedCount === 0) {
-                throw new Error('Nenhuma alteração foi feita');
+            const dadosAtualizados = filme.toJSON();
+            const result = await collection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: dadosAtualizados }
+            );
+
+            // Se não houve modificação, pode ser que os dados sejam idênticos
+            // Mas ainda retornamos sucesso, pois o filme foi "atualizado" (mesmo que com os mesmos dados)
+            if (result.matchedCount === 0) {
+                return {
+                    success: false,
+                    message: 'Filme não encontrado',
+                    data: null
+                };
             }
 
             return {
