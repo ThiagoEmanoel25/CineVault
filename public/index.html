@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Filmes 🎬</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 Catálogo de Filmes</h1>
+            <p class="subtitle">Gerencie sua coleção de filmes favoritos</p>
+        </header>
+
+        <!-- Formulário para adicionar/editar filme -->
+        <section class="form-section">
+            <div class="card">
+                <h2 id="form-title">Adicionar Novo Filme</h2>
+                <form id="filme-form">
+                    <input type="hidden" id="filme-id" value="">
+
+                    <div class="form-group">
+                        <label for="nome">Nome do Filme</label>
+                        <input type="text" id="nome" required placeholder="Ex: The Batman">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="genero">Gênero</label>
+                        <input type="text" id="genero" required placeholder="Ex: Ação, Drama, Comédia">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="anolancemento">Ano de Lançamento</label>
+                        <input type="number" id="anolancemento" required min="1800" max="2030" placeholder="Ex: 2022">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="diretor">Diretor (opcional)</label>
+                        <input type="text" id="diretor" placeholder="Ex: Christopher Nolan">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="duracao">Duração (minutos)</label>
+                            <input type="number" id="duracao" min="0" max="600" placeholder="Ex: 120">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="avaliacao">Avaliação (0-10)</label>
+                            <input type="number" id="avaliacao" min="0" max="10" step="0.1" placeholder="Ex: 8.5">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sinopse">Sinopse (opcional)</label>
+                        <textarea id="sinopse" rows="3" placeholder="Breve descrição do filme..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="poster">URL do Poster (opcional)</label>
+                        <input type="url" id="poster" placeholder="https://exemplo.com/poster.jpg">
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="submit-btn">Adicionar Filme</button>
+                        <button type="button" class="btn btn-secondary" id="cancel-btn" style="display: none;">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Estatísticas -->
+        <section class="stats-section">
+            <div class="card stats-card">
+                <h3>📊 Estatísticas</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Total de Filmes</span>
+                        <span class="stat-value" id="total-filmes">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Ano Médio</span>
+                        <span class="stat-value" id="ano-medio">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avaliação Média</span>
+                        <span class="stat-value" id="avaliacao-media">0.0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Gênero Mais Comum</span>
+                        <span class="stat-value" id="genero-comum">-</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filtros e busca -->
+        <section class="filters-section">
+            <div class="card">
+                <div class="filters">
+                    <input type="text" id="search-input" placeholder="🔍 Buscar por nome, gênero ou diretor..." class="search-input">
+                    <div class="filter-buttons">
+                        <button id="filter-all" class="btn-filter active">Todos</button>
+                        <button id="filter-acao" class="btn-filter">Ação</button>
+                        <button id="filter-drama" class="btn-filter">Drama</button>
+                        <button id="filter-comedia" class="btn-filter">Comédia</button>
+                        <button id="filter-ficcao" class="btn-filter">Ficção</button>
+                    </div>
+                    <div class="sort-buttons">
+                        <span class="sort-label">Ordenar por:</span>
+                        <button id="sort-nome" class="btn-sort active" data-sort="nome">📝 Nome</button>
+                        <button id="sort-ano" class="btn-sort" data-sort="ano">📅 Ano</button>
+                        <button id="sort-avaliacao" class="btn-sort" data-sort="avaliacao">⭐ Avaliação</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Lista de filmes -->
+        <section class="filmes-section">
+            <div class="section-header">
+                <h2>Meus Filmes</h2>
+                <span id="filmes-count" class="badge">0</span>
+                <div class="header-actions">
+                    <button id="export-btn" class="btn btn-secondary" title="Exportar catálogo">
+                        📥 Exportar
+                    </button>
+                    <input type="file" id="import-input" accept=".json" style="display: none;">
+                    <button id="import-btn" class="btn btn-secondary" title="Importar catálogo">
+                        📤 Importar
+                    </button>
+                </div>
+            </div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Carregando filmes...</p>
+            </div>
+
+            <div id="filmes-container" class="filmes-grid">
+                <!-- Os filmes serão inseridos aqui via JavaScript -->
+            </div>
+
+            <div id="empty-state" class="empty-state">
+                <div class="empty-icon">🎞️</div>
+                <h3>Nenhum filme cadastrado</h3>
+                <p>Adicione seu primeiro filme usando o formulário acima!</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal de confirmação -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modal-title">Confirmar ação</h3>
+            <p id="modal-message"></p>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="btn btn-danger">Confirmar</button>
+                <button id="modal-cancel" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes do Filme -->
+    <div id="detalhes-modal" class="modal">
+        <div class="modal-content modal-detalhes">
+            <span class="close-detalhes">&times;</span>
+            <div id="detalhes-content">
+                <!-- Conteúdo será preenchido via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
