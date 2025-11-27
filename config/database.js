@@ -10,8 +10,7 @@ const config = {
 
 // Validar se a URI está configurada
 if (!config.uri) {
-    console.error('❌ MONGODB_URI não configurada! Crie um arquivo .env baseado no .env.example');
-    process.exit(1);
+    console.error('❌ MONGODB_URI não configurada! Configure nas variáveis de ambiente do Vercel.');
 }
 
 let client;
@@ -20,6 +19,10 @@ let db;
 // Função para conectar ao banco
 async function connectToDatabase() {
     try {
+        if (!config.uri) {
+            throw new Error('MONGODB_URI não configurada! Configure nas variáveis de ambiente do Vercel.');
+        }
+        
         if (!client) {
             client = new MongoClient(config.uri);
             await client.connect();
