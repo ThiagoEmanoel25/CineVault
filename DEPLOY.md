@@ -1,4 +1,4 @@
-# 🚀 Guia de Deploy no Vercel
+# 🚀 Guia de Deploy - CineVault v2.0
 
 Este guia vai te ensinar passo a passo como fazer o deploy da sua aplicação no Vercel.
 
@@ -6,40 +6,59 @@ Este guia vai te ensinar passo a passo como fazer o deploy da sua aplicação no
 
 1. Conta no GitHub (gratuita)
 2. Conta no Vercel (gratuita) - [vercel.com](https://vercel.com)
-3. Node.js instalado localmente (para testar antes do deploy)
+3. Node.js 18+ instalado localmente
+4. MongoDB Atlas configurado
 
 ## 🔧 Passo 1: Preparar o Projeto
 
-### 1.1 Instalar Dependências
+### 1.1 Configurar Variáveis de Ambiente
 
-Certifique-se de que todas as dependências estão instaladas:
+**⚠️ IMPORTANTE:** O projeto agora usa variáveis de ambiente para segurança!
+
+1. Copie o arquivo `.env.example` para `.env`:
+```bash
+cp .env.example .env
+```
+
+2. Edite o arquivo `.env` com suas credenciais:
+```env
+MONGODB_URI=mongodb+srv://seu_usuario:sua_senha@cluster.mongodb.net/seu_banco?retryWrites=true&w=majority
+MONGODB_DB_NAME=CatalogoTestee
+MONGODB_COLLECTION=Filmes
+PORT=3000
+NODE_ENV=development
+```
+
+### 1.2 Instalar Dependências
 
 ```bash
 npm install
 ```
 
-### 1.2 Testar Localmente
-
-Antes de fazer o deploy, teste a aplicação localmente:
+### 1.3 Testar Localmente
 
 ```bash
-npm start
+npm run dev   # desenvolvimento com hot-reload
+# ou
+npm start     # produção
 ```
 
-Acesse `http://localhost:3000` no navegador para verificar se está tudo funcionando.
+Acesse `http://localhost:3000` no navegador.
 
-## 📦 Passo 2: Configurar Variáveis de Ambiente
+## 📦 Passo 2: Configurar Variáveis no Vercel
 
-### 2.1 No Vercel
+### 2.1 Variáveis Obrigatórias
 
-Quando fizer o deploy, você precisará configurar as variáveis de ambiente no painel do Vercel:
+No painel do Vercel (**Settings** → **Environment Variables**), adicione:
 
-1. Acesse seu projeto no Vercel
-2. Vá em **Settings** → **Environment Variables**
-3. Adicione as seguintes variáveis (se necessário):
-   - `MONGODB_URI` (se você quiser usar variáveis de ambiente para a conexão)
+| Variável | Descrição | Exemplo |
+|----------|-----------|---------|
+| `MONGODB_URI` | String de conexão do MongoDB | `mongodb+srv://user:pass@cluster.mongodb.net/db` |
+| `MONGODB_DB_NAME` | Nome do banco de dados | `CatalogoTestee` |
+| `MONGODB_COLLECTION` | Nome da coleção | `Filmes` |
+| `NODE_ENV` | Ambiente | `production` |
 
-**Nota:** Por enquanto, as credenciais do MongoDB estão no arquivo `config/database.js`. Para produção, é recomendado usar variáveis de ambiente.
+**⚠️ NUNCA commite o arquivo `.env` no Git!** (já está no `.gitignore`)
 
 ## 🌐 Passo 3: Fazer Deploy via GitHub
 
@@ -164,14 +183,24 @@ Todas as rotas que começam com `/api/` são direcionadas para o `server.js` (co
 3. **Monitore os logs no painel do Vercel** para identificar problemas
 4. **O Vercel oferece deploy automático** sempre que você faz push no GitHub
 
+## 🆕 Novidades da v2.0
+
+- **Segurança melhorada:** Credenciais via variáveis de ambiente
+- **Rate limiting:** Proteção contra abuso da API
+- **Helmet.js:** Headers de segurança HTTP
+- **Frontend moderno:** Design dark mode com animações
+- **Paginação:** API suporta `?page=1&limit=10`
+- **Busca avançada:** `?busca=termo` pesquisa em nome, diretor e sinopse
+
 ## 📚 Recursos Úteis
 
 - [Documentação do Vercel](https://vercel.com/docs)
 - [Vercel CLI](https://vercel.com/docs/cli)
 - [Guia de Node.js no Vercel](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/node-js)
+- [MongoDB Atlas](https://www.mongodb.com/atlas)
 
 ---
 
-**Pronto!** Agora você tem uma aplicação moderna e estilosa rodando na nuvem! 🚀✨
+**Pronto!** Agora você tem o CineVault v2.0 rodando na nuvem! 🎬🚀
 
 

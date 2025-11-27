@@ -1,16 +1,18 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
+require('dotenv').config();
 
-// Configurações do banco de dados
+// Configurações do banco de dados via variáveis de ambiente
 const config = {
-    username: 'thiagoemanoel181_db_user',
-    password: 'EMglaGBxGy5YSGoY',
-    clusterurl: 'cluster01',
-    dbname: 'CatalogoTestee',
-    collectionName: 'Filmes'
+    uri: process.env.MONGODB_URI,
+    dbname: process.env.MONGODB_DB_NAME || 'CatalogoTestee',
+    collectionName: process.env.MONGODB_COLLECTION || 'Filmes'
 };
 
-// URL de conexão
-const url = `mongodb+srv://${config.username}:${config.password}@${config.clusterurl}.e4qtilx.mongodb.net/${config.dbname}?retryWrites=true&w=majority`;
+// Validar se a URI está configurada
+if (!config.uri) {
+    console.error('❌ MONGODB_URI não configurada! Crie um arquivo .env baseado no .env.example');
+    process.exit(1);
+}
 
 let client;
 let db;
@@ -19,7 +21,7 @@ let db;
 async function connectToDatabase() {
     try {
         if (!client) {
-            client = new MongoClient(url);
+            client = new MongoClient(config.uri);
             await client.connect();
             console.log('Conectado ao MongoDB Atlas!');
         }
@@ -57,6 +59,7 @@ module.exports = {
     connectToDatabase,
     getCollection,
     closeConnection,
-    config
+    config,
+    ObjectId
 };
 

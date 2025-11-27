@@ -1,11 +1,14 @@
-// Configuração da API
+// ========================================
+// CineVault - Modern Movie Catalog App
+// ========================================
+
 const API_BASE_URL = window.location.origin + '/api';
 
 // Estado da aplicação
 let filmes = [];
 let editingId = null;
 let currentFilter = 'all';
-let sortBy = 'nome'; // 'nome', 'ano', 'avaliacao'
+let sortBy = 'nome';
 let searchTimeout = null;
 
 // Elementos DOM
@@ -20,13 +23,13 @@ const sinopseInput = document.getElementById('sinopse');
 const posterInput = document.getElementById('poster');
 const filmeIdInput = document.getElementById('filme-id');
 const submitBtn = document.getElementById('submit-btn');
-const cancelBtn = document.getElementById('cancel-btn');
 const formTitle = document.getElementById('form-title');
 const filmesContainer = document.getElementById('filmes-container');
 const emptyState = document.getElementById('empty-state');
 const filmesCount = document.getElementById('filmes-count');
 const searchInput = document.getElementById('search-input');
 const loading = document.getElementById('loading');
+const formModal = document.getElementById('form-modal');
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,9 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Event Listeners
 function setupEventListeners() {
-    filmeForm.addEventListener('submit', handleSubmit);
-    cancelBtn.addEventListener('click', cancelEdit);
-    searchInput.addEventListener('input', handleSearch);
+    // Form
+    filmeForm?.addEventListener('submit', handleSubmit);
+    searchInput?.addEventListener('input', handleSearch);
+
+    // Botão adicionar filme
+    document.getElementById('add-filme-btn')?.addEventListener('click', abrirModal);
 
     // Filtros
     document.getElementById('filter-all')?.addEventListener('click', () => setFilter('all'));
@@ -46,6 +52,7 @@ function setupEventListeners() {
     document.getElementById('filter-drama')?.addEventListener('click', () => setFilter('drama'));
     document.getElementById('filter-comedia')?.addEventListener('click', () => setFilter('comédia'));
     document.getElementById('filter-ficcao')?.addEventListener('click', () => setFilter('ficção'));
+    document.getElementById('filter-terror')?.addEventListener('click', () => setFilter('terror'));
 
     // Ordenação
     document.querySelectorAll('.btn-sort').forEach(btn => {
@@ -61,6 +68,15 @@ function setupEventListeners() {
         document.getElementById('import-input')?.click();
     });
     document.getElementById('import-input')?.addEventListener('change', importarFilmes);
+
+    // Fechar modais com ESC
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            fecharFormModal();
+            fecharDetalhes();
+            document.getElementById('modal')?.classList.remove('show');
+        }
+    });
 }
 
 // Validação do formulário
@@ -216,7 +232,7 @@ function renderizarFilmes() {
     }
 
     // Aplicar busca
-    const searchTerm = searchInput.value.toLowerCase();
+    const searchTerm = searchInput?.value?.toLowerCase() || '';
     if (searchTerm) {
         filmesFiltrados = filmesFiltrados.filter(filme =>
             filme.nome.toLowerCase().includes(searchTerm) ||
@@ -232,67 +248,63 @@ function renderizarFilmes() {
             case 'nome':
                 return a.nome.localeCompare(b.nome);
             case 'ano':
-                return b.anolancemento - a.anolancemento; // mais recente primeiro
+                return b.anolancemento - a.anolancemento;
             case 'avaliacao':
-                return (b.avaliacao || 0) - (a.avaliacao || 0); // maior avaliação primeiro
+                return (b.avaliacao || 0) - (a.avaliacao || 0);
             default:
                 return 0;
         }
     });
 
     // Atualizar contador
-    filmesCount.textContent = filmesFiltrados.length;
+    if (filmesCount) {
+        filmesCount.textContent = `${filmesFiltrados.length} filme${filmesFiltrados.length !== 1 ? 's' : ''}`;
+    }
 
     // Renderizar
     if (filmesFiltrados.length === 0) {
-        filmesContainer.style.display = 'none';
-        emptyState.style.display = 'block';
+        if (filmesContainer) filmesContainer.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'block';
     } else {
-        filmesContainer.style.display = 'grid';
-        emptyState.style.display = 'none';
+        if (filmesContainer) filmesContainer.style.display = 'grid';
+        if (emptyState) emptyState.style.display = 'none';
 
-        filmesContainer.innerHTML = filmesFiltrados.map(filme => {
-            // Sempre mostrar poster (placeholder SVG local se não tiver URL)
-            const posterUrl = (filme.poster && filme.poster.trim())
-                ? filme.poster
-                : gerarPlaceholderSVG(filme.nome, 300, 450);
-            const placeholderUrl = gerarPlaceholderSVG(filme.nome, 300, 450);
+        if (filmesContainer) {
+            filmesContainer.innerHTML = filmesFiltrados.map(filme => {
+                const posterUrl = (filme.poster && filme.poster.trim())
+                    ? filme.poster
+                    : gerarPlaceholderSVG(filme.nome, 300, 450);
+                const placeholderUrl = gerarPlaceholderSVG(filme.nome, 300, 450);
+                const avaliacao = (filme.avaliacao && filme.avaliacao > 0) ? filme.avaliacao.toFixed(1) : null;
 
-            const avaliacao = (filme.avaliacao && filme.avaliacao > 0) ? filme.avaliacao.toFixed(1) : 'N/A';
-            const duracao = (filme.duracao && filme.duracao > 0) ? `${filme.duracao} min` : '';
-            const diretor = (filme.diretor && filme.diretor.trim()) ? `<div class="filme-diretor">🎬 ${escapeHtml(filme.diretor)}</div>` : '';
-            const sinopse = (filme.sinopse && filme.sinopse.trim()) ? `<div class="filme-sinopse">${escapeHtml(filme.sinopse.substring(0, 100))}${filme.sinopse.length > 100 ? '...' : ''}</div>` : '';
-
-            return `
-                <div class="filme-card">
-                    <img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(filme.nome)}" class="filme-poster" onerror="this.src='${placeholderUrl}'">
-                    <div class="filme-header">
-                        <div>
+                return `
+                    <div class="filme-card" onclick="verDetalhes('${filme._id}')">
+                        <img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(filme.nome)}" class="filme-poster" onerror="this.src='${placeholderUrl}'">
+                        <div class="filme-content">
                             <div class="filme-nome">${escapeHtml(filme.nome)}</div>
+                            <div class="filme-meta">
+                                <span class="filme-ano">${filme.anolancemento}</span>
+                                ${avaliacao ? `<span class="filme-rating">⭐ ${avaliacao}</span>` : ''}
+                            </div>
+                            <span class="filme-genero">${escapeHtml(filme.genero)}</span>
                         </div>
-                        <div class="filme-ano">${filme.anolancemento}</div>
+                        <div class="filme-actions" onclick="event.stopPropagation()">
+                            <button class="btn btn-ghost" onclick="editarFilme('${filme._id}')" title="Editar">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="btn btn-danger" onclick="confirmarDeletar('${filme._id}')" title="Excluir">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="filme-genero">${escapeHtml(filme.genero)}</div>
-                    ${diretor}
-                    <div class="filme-info">
-                        ${avaliacao !== 'N/A' ? `<span class="filme-avaliacao">⭐ ${avaliacao}</span>` : ''}
-                        ${duracao ? `<span class="filme-duracao">⏱️ ${duracao}</span>` : ''}
-                    </div>
-                    ${sinopse}
-                    <div class="filme-actions">
-                        <button class="btn btn-info" onclick="verDetalhes('${filme._id}')">
-                            👁️ Ver Detalhes
-                        </button>
-                        <button class="btn btn-edit" onclick="editarFilme('${filme._id}')">
-                            ✏️ Editar
-                        </button>
-                        <button class="btn btn-delete" onclick="confirmarDeletar('${filme._id}')">
-                            🗑️ Deletar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
+        }
     }
 }
 
@@ -343,10 +355,10 @@ async function handleSubmit(e) {
 
         if (result.success) {
             showToast(
-                editingId ? 'Filme atualizado com sucesso! 🎉' : 'Filme adicionado com sucesso! 🎉',
+                editingId ? 'Filme atualizado com sucesso!' : 'Filme adicionado com sucesso!',
                 'success'
             );
-            resetForm();
+            fecharFormModal();
             carregarFilmes();
         } else {
             // Melhorar mensagem de erro
@@ -375,14 +387,19 @@ async function editarFilme(id) {
             if (avaliacaoInput) avaliacaoInput.value = filme.avaliacao || '';
             if (sinopseInput) sinopseInput.value = filme.sinopse || '';
             if (posterInput) posterInput.value = filme.poster || '';
-            filmeIdInput.value = filme._id;
+            if (filmeIdInput) filmeIdInput.value = filme._id;
             editingId = filme._id;
 
-            formTitle.textContent = 'Editar Filme';
-            submitBtn.textContent = 'Atualizar Filme';
-            cancelBtn.style.display = 'block';
+            if (formTitle) formTitle.textContent = 'Editar Filme';
+            if (submitBtn) submitBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Atualizar Filme
+            `;
 
-            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+            // Abrir modal
+            if (formModal) formModal.classList.add('show');
         } else {
             showToast('Erro ao carregar filme', 'error');
         }
@@ -392,19 +409,30 @@ async function editarFilme(id) {
     }
 }
 
-// Cancelar edição
-function cancelEdit() {
+// Abrir modal de formulário
+function abrirModal() {
+    resetForm();
+    if (formModal) formModal.classList.add('show');
+}
+
+// Fechar modal de formulário
+function fecharFormModal() {
+    if (formModal) formModal.classList.remove('show');
     resetForm();
 }
 
 // Resetar formulário
 function resetForm() {
-    filmeForm.reset();
-    filmeIdInput.value = '';
+    if (filmeForm) filmeForm.reset();
+    if (filmeIdInput) filmeIdInput.value = '';
     editingId = null;
-    formTitle.textContent = 'Adicionar Novo Filme';
-    submitBtn.textContent = 'Adicionar Filme';
-    cancelBtn.style.display = 'none';
+    if (formTitle) formTitle.textContent = 'Novo Filme';
+    if (submitBtn) submitBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        Salvar Filme
+    `;
 }
 
 // Confirmar deletar
@@ -743,3 +771,6 @@ function gerarEstrelas(avaliacao) {
 window.editarFilme = editarFilme;
 window.confirmarDeletar = confirmarDeletar;
 window.verDetalhes = verDetalhes;
+window.abrirModal = abrirModal;
+window.fecharFormModal = fecharFormModal;
+window.fecharDetalhes = fecharDetalhes;
