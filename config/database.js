@@ -4,7 +4,7 @@ const { MongoClient } = require('mongodb');
 const config = {
     username: 'thiagoemanoel181_db_user',
     password: 'EMglaGBxGy5YSGoY',
-    clusterurl: 'Cluster01',
+    clusterurl: 'cluster01',
     dbname: 'CatalogoTestee',
     collectionName: 'Filmes'
 };

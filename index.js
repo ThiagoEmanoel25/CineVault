@@ -2,7 +2,7 @@ const {MongoClient} = require('mongodb');
 
 const username = 'thiagoemanoel181_db_user';
 const password = 'EMglaGBxGy5YSGoY';
-const clusterurl = 'Cluster01';
+const clusterurl = 'cluster01';
 const dbname = 'CatalogoTestee';
 const collectionName = 'Filmes';
 
