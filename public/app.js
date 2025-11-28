@@ -729,6 +729,13 @@ function verDetalhes(id) {
 
     modal.classList.add('show');
 
+    // Configurar ID do filme para comentários
+    currentFilmeIdForComments = filme._id;
+    document.getElementById('comentario-filme-id').value = filme._id;
+    
+    // Carregar comentários do filme
+    carregarComentarios(filme._id);
+
     // Fechar modal
     document.querySelector('.close-detalhes').onclick = fecharDetalhes;
     modal.onclick = (e) => {
@@ -767,6 +774,209 @@ function gerarEstrelas(avaliacao) {
     return html;
 }
 
+// ========================================
+// Comentários - Funções
+// ========================================
+
+let currentFilmeIdForComments = null;
+
+// Carregar comentários de um filme
+async function carregarComentarios(filmeId) {
+    const listaContainer = document.getElementById('comentarios-lista');
+    const countBadge = document.getElementById('comentarios-count');
+    
+    if (!listaContainer) return;
+    
+    // Mostrar loading
+    listaContainer.innerHTML = `
+        <div class="comentarios-loading">
+            <div class="spinner"></div>
+            <p>Carregando comentários...</p>
+        </div>
+    `;
+    
+    try {
+        const result = await fazerRequisicao(`${API_BASE_URL}/comentarios/filme/${filmeId}`);
+        
+        if (result.success) {
+            const comentarios = result.data || [];
+            countBadge.textContent = comentarios.length;
+            
+            if (comentarios.length === 0) {
+                listaContainer.innerHTML = `
+                    <div class="comentarios-empty">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <p>Nenhum comentário ainda. Seja o primeiro a comentar!</p>
+                    </div>
+                `;
+            } else {
+                listaContainer.innerHTML = comentarios.map(comentario => renderizarComentario(comentario)).join('');
+            }
+        } else {
+            listaContainer.innerHTML = `
+                <div class="comentarios-empty">
+                    <p>Erro ao carregar comentários</p>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar comentários:', error);
+        listaContainer.innerHTML = `
+            <div class="comentarios-empty">
+                <p>Erro ao conectar com o servidor</p>
+            </div>
+        `;
+    }
+}
+
+// Renderizar um comentário
+function renderizarComentario(comentario) {
+    const data = new Date(comentario.dataCriacao);
+    const dataFormatada = data.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    const avaliacaoHtml = comentario.avaliacao > 0 
+        ? `<span class="comentario-rating">⭐ ${comentario.avaliacao.toFixed(1)}</span>`
+        : '';
+    
+    return `
+        <div class="comentario-item" data-id="${comentario._id}">
+            <div class="comentario-header">
+                <div class="comentario-autor-info">
+                    <span class="comentario-autor">${escapeHtml(comentario.autor)}</span>
+                    <span class="comentario-data">${dataFormatada}</span>
+                </div>
+                ${avaliacaoHtml}
+            </div>
+            <p class="comentario-texto">${escapeHtml(comentario.texto)}</p>
+            <div class="comentario-actions">
+                <button class="btn btn-ghost" onclick="deletarComentario('${comentario._id}')" title="Excluir">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Excluir
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Enviar novo comentário
+async function enviarComentario(e) {
+    e.preventDefault();
+    
+    const filmeId = document.getElementById('comentario-filme-id').value;
+    const autor = document.getElementById('comentario-autor').value.trim();
+    const texto = document.getElementById('comentario-texto').value.trim();
+    const avaliacao = document.getElementById('comentario-avaliacao').value;
+    
+    if (!autor || !texto) {
+        showToast('Preencha seu nome e comentário', 'error');
+        return;
+    }
+    
+    const comentarioData = {
+        filmeId: filmeId,
+        autor: autor,
+        texto: texto,
+        avaliacao: avaliacao ? parseFloat(avaliacao) : 0
+    };
+    
+    try {
+        const result = await fazerRequisicao(`${API_BASE_URL}/comentarios`, {
+            method: 'POST',
+            body: JSON.stringify(comentarioData)
+        });
+        
+        if (result.success) {
+            showToast('Comentário enviado com sucesso! 💬', 'success');
+            
+            // Limpar formulário
+            document.getElementById('comentario-autor').value = '';
+            document.getElementById('comentario-texto').value = '';
+            document.getElementById('comentario-avaliacao').value = '';
+            document.getElementById('comentario-chars').textContent = '0/1000';
+            
+            // Recarregar comentários
+            carregarComentarios(filmeId);
+        } else {
+            showToast(result.message || 'Erro ao enviar comentário', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao enviar comentário:', error);
+        showToast('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// Deletar comentário
+async function deletarComentario(comentarioId) {
+    if (!confirm('Tem certeza que deseja excluir este comentário?')) {
+        return;
+    }
+    
+    try {
+        const result = await fazerRequisicao(`${API_BASE_URL}/comentarios/${comentarioId}`, {
+            method: 'DELETE'
+        });
+        
+        if (result.success) {
+            showToast('Comentário excluído! 🗑️', 'success');
+            
+            // Recarregar comentários
+            if (currentFilmeIdForComments) {
+                carregarComentarios(currentFilmeIdForComments);
+            }
+        } else {
+            showToast(result.message || 'Erro ao excluir comentário', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao excluir comentário:', error);
+        showToast('Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// Contador de caracteres do comentário
+function setupComentarioCharCounter() {
+    const textarea = document.getElementById('comentario-texto');
+    const counter = document.getElementById('comentario-chars');
+    
+    if (textarea && counter) {
+        textarea.addEventListener('input', () => {
+            const length = textarea.value.length;
+            counter.textContent = `${length}/1000`;
+            
+            if (length > 900) {
+                counter.style.color = 'var(--warning)';
+            } else if (length >= 1000) {
+                counter.style.color = 'var(--danger)';
+            } else {
+                counter.style.color = 'var(--text-muted)';
+            }
+        });
+    }
+}
+
+// Setup do formulário de comentários
+function setupComentarioForm() {
+    const form = document.getElementById('comentario-form');
+    if (form) {
+        form.addEventListener('submit', enviarComentario);
+    }
+    setupComentarioCharCounter();
+}
+
+// Inicializar comentários quando modal de detalhes abrir
+document.addEventListener('DOMContentLoaded', () => {
+    setupComentarioForm();
+});
+
 // Expor funções globalmente
 window.editarFilme = editarFilme;
 window.confirmarDeletar = confirmarDeletar;
@@ -774,3 +984,4 @@ window.verDetalhes = verDetalhes;
 window.abrirModal = abrirModal;
 window.fecharFormModal = fecharFormModal;
 window.fecharDetalhes = fecharDetalhes;
+window.deletarComentario = deletarComentario;

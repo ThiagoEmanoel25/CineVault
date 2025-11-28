@@ -301,6 +301,41 @@
             <div id="detalhes-content">
                 <!-- Conteúdo será preenchido via JavaScript -->
             </div>
+            
+            <!-- Seção de Comentários -->
+            <div id="comentarios-section" class="comentarios-section">
+                <div class="comentarios-header">
+                    <h3>💬 Comentários</h3>
+                    <span id="comentarios-count" class="badge-small">0</span>
+                </div>
+                
+                <!-- Formulário de novo comentário -->
+                <form id="comentario-form" class="comentario-form">
+                    <input type="hidden" id="comentario-filme-id" value="">
+                    <div class="comentario-form-row">
+                        <input type="text" id="comentario-autor" placeholder="Seu nome" required maxlength="50">
+                        <div class="comentario-avaliacao-input">
+                            <label>Nota:</label>
+                            <input type="number" id="comentario-avaliacao" min="0" max="10" step="0.5" placeholder="0-10">
+                        </div>
+                    </div>
+                    <textarea id="comentario-texto" placeholder="Escreva seu comentário..." required maxlength="1000" rows="3"></textarea>
+                    <div class="comentario-form-actions">
+                        <span id="comentario-chars">0/1000</span>
+                        <button type="submit" class="btn btn-primary btn-small">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path>
+                            </svg>
+                            Enviar
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Lista de comentários -->
+                <div id="comentarios-lista" class="comentarios-lista">
+                    <!-- Comentários serão inseridos aqui -->
+                </div>
+            </div>
         </div>
     </div>
 
