@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { closeConnection } = require('./config/database');
 const filmeRoutes = require('./routes/filmeRoutes');
+const comentarioRoutes = require('./routes/comentarioRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,6 +45,7 @@ if (isDev) {
 
 // Rotas da API
 app.use('/api/filmes', filmeRoutes);
+app.use('/api/comentarios', comentarioRoutes);
 
 // Rota de health check
 app.get('/api/health', (req, res) => {
@@ -51,7 +53,7 @@ app.get('/api/health', (req, res) => {
         status: 'OK', 
         message: 'API está funcionando!',
         timestamp: new Date().toISOString(),
-        version: '2.0.0'
+        version: '2.1.0'
     });
 });
 
@@ -87,7 +89,7 @@ app.use((req, res) => {
 const server = app.listen(PORT, () => {
     console.log('');
     console.log('🎬 ═══════════════════════════════════════════');
-    console.log('   CATÁLOGO DE FILMES API v2.0.0');
+    console.log('   CATÁLOGO DE FILMES API v2.1.0');
     console.log('═══════════════════════════════════════════════');
     console.log(`🚀 Servidor rodando na porta ${PORT}`);
     console.log(`📡 API: http://localhost:${PORT}/api`);
